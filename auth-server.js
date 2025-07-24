@@ -44,11 +44,10 @@ async function initializeClient() {
 
       client = new discoveredIssuer.Client({
         client_id: '9tg475st96qptbvefusar69nj',
-        client_secret: '19i56ejoqbutpgtbvefusar69nj',
+        client_secret: '19i56ejoqbutpgt9nsh51e6ca9t3b8jg62of4t3mk14rp0qt7qr', // ✅ le bon secret ici
         redirect_uris: ['https://auth-server-61ms.onrender.com/callback'],
         response_types: ['code']
       });
-
       console.log('✅ Client OpenID initialisé');
     } catch (err) {
       console.error('❌ Erreur découverte ou init OpenID:', err);
