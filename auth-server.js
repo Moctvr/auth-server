@@ -1,27 +1,30 @@
 const express = require('express');
 const session = require('express-session');
-const RedisStore = require('connect-redis').default;
 const Redis = require('ioredis');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const { Issuer, generators } = require('openid-client');
 
+// ✅ Chargement compatible avec CommonJS
+const RedisStoreModule = require('connect-redis');
+const RedisStore = RedisStoreModule.default || RedisStoreModule;
+
 console.log('lancement auth-server.js depuis', __dirname);
 
 const app = express();
 const PORT = 4000;
-
 const API_BASE = 'https://1irywxa5c3.execute-api.ca-central-1.amazonaws.com/prod';
 
-// 🚀 Redis client setup
+// 🔌 Redis client
 const redisClient = new Redis(process.env.REDIS_URL);
 
-// ✅ RedisStore (en version connect-redis v9)
+// 🏪 RedisStore pour express-session
 const redisStore = new RedisStore({
   client: redisClient,
   prefix: 'sess:',
 });
 
+// 🔐 Session middleware
 app.use(
   session({
     store: redisStore,
@@ -29,12 +32,13 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false,
+      secure: false, // Passe à true en production avec HTTPS
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
     },
   })
 );
+
 let client;
 let initializing = null;
 
@@ -211,18 +215,11 @@ app.get('/', (req, res) => {
   await initializeClient();
   console.log('✅ Client OpenID initialisé et prêt');
 
-  // Toujours lancer le serveur, sauf si explicitement désactivé
   const isOffline = process.env.IS_OFFLINE === 'true';
 
-  if (isOffline) {
-    app.listen(PORT, () => {
-      console.log(`🚀 Serveur auth lancé en local sur http://localhost:${PORT}`);
-    });
-  } else {
-    app.listen(PORT, () => {
-      console.log(`🚀 Serveur auth lancé sur le port ${PORT} (Render ou autre)`);
-    });
-  }
+  app.listen(PORT, () => {
+    console.log(`🚀 Serveur auth lancé sur le port ${PORT} (${isOffline ? 'local' : 'Render ou autre'})`);
+  });
 })();
 
 module.exports = app;
