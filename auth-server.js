@@ -1,7 +1,7 @@
 const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
-const fetch = require('node-fetch');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const { Issuer, generators } = require('openid-client');
 
 console.log('lancement auth-server.js depuis', __dirname);
