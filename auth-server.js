@@ -24,12 +24,17 @@ app.use(cors({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+app.set('trust proxy', 1);
+
 app.use(session({
   secret: 'your-secret',
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    secure: true,          // ⚠️ obligatoire sur HTTPS
+    sameSite: 'none'       // ⚠️ pour autoriser l’envoi cross-site
+  }
 }));
-
 let client;
 let initializing = null;
 
