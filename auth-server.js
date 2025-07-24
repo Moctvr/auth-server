@@ -1,7 +1,7 @@
 const express = require('express');
 const session = require('express-session');
-const RedisStore = require('connect-redis').default; // ✅
-const { createClient } = require('redis');
+const RedisStore = require('connect-redis').default;
+const Redis = require('ioredis');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const { Issuer, generators } = require('openid-client');
@@ -14,10 +14,7 @@ const PORT = 4000;
 const API_BASE = 'https://1irywxa5c3.execute-api.ca-central-1.amazonaws.com/prod';
 
 // 🚀 Redis client setup
-const redisClient = createClient({
-  url: process.env.REDIS_URL
-});
-redisClient.connect().catch(console.error);
+const redisClient = new Redis(process.env.REDIS_URL);
 
 // ✅ RedisStore (en version connect-redis v9)
 const redisStore = new RedisStore({
