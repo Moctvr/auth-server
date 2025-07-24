@@ -1,0 +1,14 @@
+{
+  "name": "auth-server",
+  "version": "1.0.0",
+  "description": "Cognito Auth Server",
+  "main": "auth-server.js",
+  "scripts": {
+    "start": "node auth-server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-session": "^1.18.1",
+    "openid-client": "^5.7.1"
+  }
+}
