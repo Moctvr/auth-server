@@ -1,43 +1,34 @@
 const express = require('express');
 const session = require('express-session');
-const Redis = require('ioredis');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const { Issuer, generators } = require('openid-client');
-
-// ✅ Chargement compatible avec CommonJS
-const RedisStoreModule = require('connect-redis');
-const RedisStore = RedisStoreModule.default || RedisStoreModule;
 
 console.log('lancement auth-server.js depuis', __dirname);
 
 const app = express();
 const PORT = 4000;
+
 const API_BASE = 'https://1irywxa5c3.execute-api.ca-central-1.amazonaws.com/prod';
 
-// 🔌 Redis client
-const redisClient = new Redis(process.env.REDIS_URL);
-
-// 🏪 RedisStore pour express-session
-const redisStore = new RedisStore({
-  client: redisClient,
-  prefix: 'sess:',
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.url}`);
+  next();
 });
 
-// 🔐 Session middleware
-app.use(
-  session({
-    store: redisStore,
-    secret: 'your-secret',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: false, // Passe à true en production avec HTTPS
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
-    },
-  })
-);
+app.use(cors({
+  origin: 'https://d10iaakzqzg2nu.cloudfront.net',
+  credentials: true
+}));
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+app.use(session({
+  secret: 'your-secret',
+  resave: false,
+  saveUninitialized: false
+}));
 
 let client;
 let initializing = null;
@@ -54,7 +45,7 @@ async function initializeClient() {
       client = new discoveredIssuer.Client({
         client_id: '9tg475st96qptbvefusar69nj',
         client_secret: '19i56ejoqbutpgtbvefusar69nj',
-        redirect_uris: ['https://d10iaakzqzg2nu.cloudfront.net/callback'],
+        redirect_uris: ['https://auth-server-61ms.onrender.com/callback'],
         response_types: ['code']
       });
 
@@ -98,7 +89,7 @@ app.get('/callback', async (req, res) => {
   const params = client.callbackParams(req);
 
   try {
-    const tokenSet = await client.callback('https://d10iaakzqzg2nu.cloudfront.net/callback', params, {
+    const tokenSet = await client.callback('https://auth-server-61ms.onrender.com/callback', params, {
       state: req.session.state,
       nonce: req.session.nonce
     });
@@ -215,11 +206,18 @@ app.get('/', (req, res) => {
   await initializeClient();
   console.log('✅ Client OpenID initialisé et prêt');
 
+  // Toujours lancer le serveur, sauf si explicitement désactivé
   const isOffline = process.env.IS_OFFLINE === 'true';
 
-  app.listen(PORT, () => {
-    console.log(`🚀 Serveur auth lancé sur le port ${PORT} (${isOffline ? 'local' : 'Render ou autre'})`);
-  });
+  if (isOffline) {
+    app.listen(PORT, () => {
+      console.log(`🚀 Serveur auth lancé en local sur http://localhost:${PORT}`);
+    });
+  } else {
+    app.listen(PORT, () => {
+      console.log(`🚀 Serveur auth lancé sur le port ${PORT} (Render ou autre)`);
+    });
+  }
 })();
 
 module.exports = app;
