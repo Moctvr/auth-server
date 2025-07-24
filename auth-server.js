@@ -1,5 +1,7 @@
 const express = require('express');
 const session = require('express-session');
+const RedisStore = require('connect-redis');
+const { createClient } = require('redis');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const { Issuer, generators } = require('openid-client');
@@ -11,23 +13,23 @@ const PORT = 4000;
 
 const API_BASE = 'https://1irywxa5c3.execute-api.ca-central-1.amazonaws.com/prod';
 
-app.use((req, res, next) => {
-  console.log(`📥 ${req.method} ${req.url}`);
-  next();
+// 🚀 Redis client setup
+const redisClient = createClient({
+  url: process.env.REDIS_URL // à définir dans Render, ex: redis://default:motdepasse@hostname:port
 });
+redisClient.connect().catch(console.error);
 
-app.use(cors({
-  origin: 'https://d10iaakzqzg2nu.cloudfront.net',
-  credentials: true
-}));
-
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-
+// ✅ Session avec Redis
 app.use(session({
+  store: new RedisStore({ client: redisClient }),
   secret: 'your-secret',
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // true si HTTPS (Render le force en général)
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 1 jour
+  }
 }));
 
 let client;
