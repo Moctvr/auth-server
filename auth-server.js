@@ -1,6 +1,6 @@
 const express = require('express');
 const session = require('express-session');
-const RedisStore = require('connect-redis');
+const RedisStore = require('connect-redis')(session); // ✅ <-- ICI
 const { createClient } = require('redis');
 const cors = require('cors');
 const fetch = require('node-fetch');
@@ -15,17 +15,16 @@ const API_BASE = 'https://1irywxa5c3.execute-api.ca-central-1.amazonaws.com/prod
 
 // 🚀 Redis client setup
 const redisClient = createClient({
-  url: process.env.REDIS_URL // ex: redis://default:motdepasse@hostname:port
+  url: process.env.REDIS_URL
 });
 redisClient.connect().catch(console.error);
 
-// ✅ Création du RedisStore une fois le client prêt
+// ✅ RedisStore (en version connect-redis v9)
 const redisStore = new RedisStore({
   client: redisClient,
   prefix: 'sess:',
 });
 
-// ✅ Session avec Redis
 app.use(
   session({
     store: redisStore,
@@ -39,7 +38,6 @@ app.use(
     },
   })
 );
-
 let client;
 let initializing = null;
 
