@@ -206,9 +206,16 @@ app.get('/', (req, res) => {
   await initializeClient();
   console.log('✅ Client OpenID initialisé et prêt');
 
-  if (process.env.IS_OFFLINE === 'true') {
+  // Toujours lancer le serveur, sauf si explicitement désactivé
+  const isOffline = process.env.IS_OFFLINE === 'true';
+
+  if (isOffline) {
     app.listen(PORT, () => {
       console.log(`🚀 Serveur auth lancé en local sur http://localhost:${PORT}`);
+    });
+  } else {
+    app.listen(PORT, () => {
+      console.log(`🚀 Serveur auth lancé sur le port ${PORT} (Render ou autre)`);
     });
   }
 })();
