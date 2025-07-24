@@ -1,6 +1,6 @@
 const express = require('express');
 const session = require('express-session');
-const RedisStore = require('connect-redis')(session);
+const RedisStore = require('connect-redis').default;
 const { createClient } = require('redis');
 const cors = require('cors');
 const fetch = require('node-fetch');
@@ -20,17 +20,19 @@ const redisClient = createClient({
 redisClient.connect().catch(console.error);
 
 // ✅ Session avec Redis
-app.use(session({
-  store: new RedisStore({ client: redisClient }),
-  secret: 'your-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: false, // true si HTTPS (Render le force en général)
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 1 jour
-  }
-}));
+app.use(
+  session({
+    store: new RedisStore({ client: redisClient }),
+    secret: 'your-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false,
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  })
+);
 
 let client;
 let initializing = null;
