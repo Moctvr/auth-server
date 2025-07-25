@@ -162,7 +162,7 @@ app.get('/logout', (req, res) => {
     ? 'http://localhost:3000'
     : 'https://d10iaakzqzg2nu.cloudfront.net';
 
-  const logoutUrl = `https://ca-central-1_0LywvRg65.auth.ca-central-1.amazoncognito.com/logout?client_id=9tg475st96qptbvefusar69nj&logout_uri=${logoutRedirect}`;
+  const logoutUrl = `https://ca-central-10lywvrg65.auth.ca-central-1.amazoncognito.com/logout?client_id=9tg475st96qptbvefusar69nj&logout_uri=${logoutRedirect}`;
   res.redirect(logoutUrl);
 });
 
