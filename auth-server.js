@@ -17,7 +17,10 @@ app.use((req, res, next) => {
 });
 
 app.use(cors({
-  origin: 'https://d10iaakzqzg2nu.cloudfront.net',
+  origin: [
+    'https://d10iaakzqzg2nu.cloudfront.net',
+    'http://localhost:3000'
+  ],
   credentials: true
 }));
 
@@ -31,10 +34,11 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true,          // ⚠️ obligatoire sur HTTPS
-    sameSite: 'none'       // ⚠️ pour autoriser l’envoi cross-site
+    secure: true,
+    sameSite: 'none'
   }
 }));
+
 let client;
 let initializing = null;
 
@@ -43,21 +47,20 @@ async function initializeClient() {
   if (initializing) return initializing;
 
   initializing = (async () => {
-    try {
-      console.log('🔧 Découverte du provider OpenID...');
-      const discoveredIssuer = await Issuer.discover('https://cognito-idp.ca-central-1.amazonaws.com/ca-central-1_0LywvRg65');
+    console.log('🔧 Découverte du provider OpenID...');
+    const discoveredIssuer = await Issuer.discover('https://cognito-idp.ca-central-1.amazonaws.com/ca-central-1_0LywvRg65');
 
-      client = new discoveredIssuer.Client({
-        client_id: '9tg475st96qptbvefusar69nj',
-        client_secret: '19i56ejoqbutpgt9nsh51e6ca9t3b8jg62of4t3mk14rp0qt7qr', // ✅ le bon secret ici
-        redirect_uris: ['https://auth-server-61ms.onrender.com/callback'],
-        response_types: ['code']
-      });
-      console.log('✅ Client OpenID initialisé');
-    } catch (err) {
-      console.error('❌ Erreur découverte ou init OpenID:', err);
-      throw err;
-    }
+    client = new discoveredIssuer.Client({
+      client_id: '9tg475st96qptbvefusar69nj',
+      client_secret: '19i56ejoqbutpgt9nsh51e6ca9t3b8jg62of4t3mk14rp0qt7qr',
+      redirect_uris: [
+        'https://auth-server-61ms.onrender.com/callback',
+        'http://localhost:4000/callback'
+      ],
+      response_types: ['code']
+    });
+
+    console.log('✅ Client OpenID initialisé');
   })();
 
   return initializing;
@@ -66,7 +69,6 @@ async function initializeClient() {
 app.get('/login', async (req, res) => {
   try {
     if (!client) {
-      console.log('⚠️ Client non initialisé, on initialise...');
       await initializeClient();
     }
 
@@ -92,8 +94,16 @@ app.get('/login', async (req, res) => {
 app.get('/callback', async (req, res) => {
   const params = client.callbackParams(req);
 
+  const baseRedirect = req.headers.host.includes('localhost')
+    ? 'http://localhost:3000'
+    : 'https://d10iaakzqzg2nu.cloudfront.net';
+
+  const thisCallback = req.headers.host.includes('localhost')
+    ? 'http://localhost:4000/callback'
+    : 'https://auth-server-61ms.onrender.com/callback';
+
   try {
-    const tokenSet = await client.callback('https://auth-server-61ms.onrender.com/callback', params, {
+    const tokenSet = await client.callback(thisCallback, params, {
       state: req.session.state,
       nonce: req.session.nonce
     });
@@ -112,8 +122,6 @@ app.get('/callback', async (req, res) => {
       user_type: userInfo.email === 'admin@knowmediq.com' ? 'admin' : 'professional'
     };
 
-    console.log('📦 Envoi à cognito-sync:', payload);
-
     const syncRes = await fetch(`${API_BASE}/cognito-sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -122,12 +130,6 @@ app.get('/callback', async (req, res) => {
 
     const syncText = await syncRes.text();
     console.log(`📥 Réponse cognito-sync: ${syncRes.status} ${syncText}`);
-
-    if (!syncRes.ok) {
-      console.error('❌ Erreur synchro DB:', syncRes.status, syncText);
-    } else {
-      console.log('✅ Synchro DB réussie');
-    }
 
     const userRes = await fetch(`${API_BASE}/users/email/${userInfo.email}`);
     const userData = await userRes.json();
@@ -144,18 +146,23 @@ app.get('/callback', async (req, res) => {
       redirectPath = '/patient/dashboard';
     }
 
-    console.log(`✅ Redirection finale vers ${redirectPath}`);
-    res.redirect(`https://d10iaakzqzg2nu.cloudfront.net${redirectPath}`);
+    console.log(`✅ Redirection finale vers ${baseRedirect}${redirectPath}`);
+    res.redirect(`${baseRedirect}${redirectPath}`);
 
   } catch (err) {
     console.error('❌ Erreur dans /callback:', err);
-    res.redirect('https://d10iaakzqzg2nu.cloudfront.net');
+    res.redirect(baseRedirect);
   }
 });
 
 app.get('/logout', (req, res) => {
   req.session.destroy();
-  const logoutUrl = `https://ca-central-10lywvrg65.auth.ca-central-1.amazoncognito.com/logout?client_id=9tg475st96qptbvefusar69nj&logout_uri=https://d10iaakzqzg2nu.cloudfront.net`;
+
+  const logoutRedirect = req.headers.host.includes('localhost')
+    ? 'http://localhost:3000'
+    : 'https://d10iaakzqzg2nu.cloudfront.net';
+
+  const logoutUrl = `https://ca-central-1_0LywvRg65.auth.ca-central-1.amazoncognito.com/logout?client_id=9tg475st96qptbvefusar69nj&logout_uri=${logoutRedirect}`;
   res.redirect(logoutUrl);
 });
 
@@ -163,19 +170,15 @@ app.get('/me', async (req, res) => {
   console.log('📦 Accès à /me | Session =>', req.session);
 
   if (!req.session.user) {
-    console.warn('❌ Aucune session utilisateur');
     return res.status(401).json({ error: 'Non authentifié' });
   }
 
   try {
     const userEmail = req.session.user.email;
-    console.log('📧 Appel API /users/email avec:', userEmail);
-
     const userRes = await fetch(`${API_BASE}/users/email/${userEmail}`);
     const userText = await userRes.text();
 
     if (!userRes.ok) {
-      console.error('❌ Erreur API /users/email:', userRes.status, userText);
       return res.status(500).json({ error: 'Erreur récupération utilisateur' });
     }
 
@@ -183,7 +186,6 @@ app.get('/me', async (req, res) => {
     try {
       userData = JSON.parse(userText);
     } catch (err) {
-      console.error('❌ JSON invalide reçu:', err, ' | Texte:', userText);
       return res.status(500).json({ error: 'Erreur parsing JSON' });
     }
 
@@ -197,7 +199,6 @@ app.get('/me', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('❌ Erreur générale dans /me:', err);
     return res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -210,18 +211,14 @@ app.get('/', (req, res) => {
   await initializeClient();
   console.log('✅ Client OpenID initialisé et prêt');
 
-  // Toujours lancer le serveur, sauf si explicitement désactivé
   const isOffline = process.env.IS_OFFLINE === 'true';
 
-  if (isOffline) {
-    app.listen(PORT, () => {
-      console.log(`🚀 Serveur auth lancé en local sur http://localhost:${PORT}`);
-    });
-  } else {
-    app.listen(PORT, () => {
-      console.log(`🚀 Serveur auth lancé sur le port ${PORT} (Render ou autre)`);
-    });
-  }
+  app.listen(PORT, () => {
+    const env = isOffline || process.env.NODE_ENV === 'development'
+      ? `http://localhost:${PORT}`
+      : `port ${PORT} (Render ou autre)`;
+    console.log(`🚀 Serveur auth lancé sur ${env}`);
+  });
 })();
 
 module.exports = app;
