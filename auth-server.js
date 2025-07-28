@@ -165,10 +165,16 @@ app.get('/me', async (req, res) => {
 
   try {
     const userRes = await fetch(`${API_BASE}/users/email/${req.session.user.email}`);
-    const userText = await userRes.text();
-    if (!userRes.ok) return res.status(500).json({ error: 'Erreur récupération utilisateur' });
+    const contentType = userRes.headers.get('content-type') || '';
 
-    const userData = JSON.parse(userText);
+    // ✅ Si ce n’est pas du JSON, ne tente pas de parser
+    if (!userRes.ok || !contentType.includes('application/json')) {
+      const rawText = await userRes.text();
+      console.error('❌ Réponse non JSON reçue:', rawText);
+      return res.status(500).json({ error: 'Erreur récupération utilisateur' });
+    }
+
+    const userData = await userRes.json();
 
     return res.json({
       ...req.session.user,
@@ -178,6 +184,7 @@ app.get('/me', async (req, res) => {
       first_name: userData.first_name,
       last_name: userData.last_name
     });
+
   } catch (err) {
     console.error('❌ /me:', err);
     return res.status(500).json({ error: 'Erreur serveur' });
