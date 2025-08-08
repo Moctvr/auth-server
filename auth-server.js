@@ -176,6 +176,7 @@ app.get('/callback', async (req, res) => {
  * - efface le cookie
  * - renvoie du JSON (pas une redirection)
  */
+// auth-server.js
 app.get('/logout', (req, res) => {
   req.session.destroy(() => {
     res.clearCookie('connect.sid', {
@@ -184,7 +185,14 @@ app.get('/logout', (req, res) => {
       sameSite: IS_LOCAL ? 'lax' : 'none',
       secure: !IS_LOCAL,
     });
-    return res.json({ message: 'Déconnecté avec succès' });
+
+    const url =
+      `${COGNITO_DOMAIN}/logout` +
+      `?client_id=${CLIENT_ID}` +
+      `&logout_uri=${encodeURIComponent(FRONTEND_URL)}` +
+      `&v=${Date.now()}`; // évite le cache
+
+    res.redirect(url);   // ✅ déconnexion Cognito + retour vers ton FRONTEND_URL
   });
 });
 
