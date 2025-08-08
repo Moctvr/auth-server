@@ -24,7 +24,7 @@ const REDIRECT_URI   = `${AUTH_BASE_URL}/callback`;
 const COGNITO_ISSUER = 'https://cognito-idp.ca-central-1.amazonaws.com/ca-central-1_0LywvRg65';
 const COGNITO_DOMAIN = 'https://ca-central-10lywvrg65.auth.ca-central-1.amazoncognito.com';
 const CLIENT_ID      = '9tg475st96qptbvefusar69nj';
-const CLIENT_SECRET  = '19i56ejoqbutpgtbvefusar69nj...'; // garde la vraie valeur
+const CLIENT_SECRET  = '19i56ejoqbutpgt9nsh51e6ca9t3b8jg62of4t3mk14rp0qt7qr'; 
 
 const API_BASE = 'https://1irywxa5c3.execute-api.ca-central-1.amazonaws.com/prod';
 
