@@ -88,6 +88,7 @@ async function initializeClient() {
 
 /* ─────────────────────────────────── ROUTES ─────────────────────────────────── */
 
+// --- dans auth-server.js
 app.get('/login', async (req, res) => {
   try {
     await initializeClient();
@@ -97,14 +98,21 @@ app.get('/login', async (req, res) => {
     req.session.state = state;
     req.session.nonce = nonce;
 
+    // NEW: depuis le bouton "Créer un compte" du flux Rejoindre
+    const isSignup = req.query.signup === '1';
+    const flow = req.query.flow || null;       // ex: 'patient'
+    if (flow) req.session.flow = flow;         // mémorise le type de flux
+
+    const extra = isSignup ? { screen_hint: 'signup' } : {};
+
     const authUrl = client.authorizationUrl({
       scope: 'openid email profile phone',
       state,
       nonce,
-      redirect_uri: REDIRECT_URI, // facultatif
+      redirect_uri: REDIRECT_URI,
+      ...extra, // screen_hint=signup si demandé
     });
 
-    console.log('➡️ Redirection vers:', authUrl);
     res.redirect(authUrl);
   } catch (err) {
     console.error('❌ /login:', err);
@@ -123,46 +131,46 @@ app.get('/callback', async (req, res) => {
     });
 
     const userInfo = await client.userinfo(tokenSet.access_token);
-    console.log('✅ userInfo reçu de Cognito:', userInfo);
-
     req.session.user = userInfo;
 
-    // Sync DB
+    // NEW: détermine le user_type selon le flow
+    let inferredType = 'professional';         // défaut historique de ton code
+    if (req.session.flow === 'patient') inferredType = 'patient';
+    if (userInfo.email === 'admin@knowmediq.com') inferredType = 'admin';
+
     const payload = {
       sub: userInfo.sub,
       email: userInfo.email,
       given_name: userInfo.given_name,
       family_name: userInfo.family_name,
       phone: userInfo.phone_number || null,
-      user_type: userInfo.email === 'admin@knowmediq.com' ? 'admin' : 'professional',
+      user_type: inferredType,                 // <-- ICI
     };
 
-    const syncRes  = await fetch(`${API_BASE}/cognito-sync`, {
+    // sync DB
+    const syncRes = await fetch(`${API_BASE}/cognito-sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     if (!syncRes.ok) console.error('❌ Erreur synchro DB:', await syncRes.text());
 
-    // Récup profil complet
-    const userRes  = await fetch(`${API_BASE}/users/email/${userInfo.email}`);
-    const contentType = userRes.headers.get('content-type') || '';
-    if (!userRes.ok || !contentType.includes('application/json')) {
-      const rawText = await userRes.text();
-      console.error('❌ /callback -> userRes non JSON:', rawText);
-      return res.redirect(FRONTEND_URL);
-    }
+    // récup profil
+    const userRes = await fetch(`${API_BASE}/users/email/${userInfo.email}`);
     const userData = await userRes.json();
 
     req.session.user_type = userData.user_type;
     req.session.profile_incomplete = userData.profile_incomplete || false;
 
+    // redirections
     let redirectPath = '/';
-    if (userData.user_type === 'admin')           redirectPath = '/admin/dashboard';
+    if (userData.user_type === 'admin')         redirectPath = '/admin/dashboard';
     else if (userData.user_type === 'professional') redirectPath = '/professional/dashboard';
-    else if (userData.user_type === 'patient')      redirectPath = '/patient/dashboard';
+    else if (userData.user_type === 'patient')  redirectPath = '/patient/dashboard';
 
-    console.log(`✅ Redirection finale vers ${FRONTEND_URL}${redirectPath}`);
+    // nettoie le flow pour les prochaines fois
+    delete req.session.flow;
+
     res.redirect(`${FRONTEND_URL}${redirectPath}`);
   } catch (err) {
     console.error('❌ /callback:', err);
